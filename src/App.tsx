@@ -10,9 +10,12 @@ function App() {
   // Each Unicode code point except whitespace is one character.
   const characters = Array.from(phrase).filter((char) => !/\s/u.test(char))
   const canConvert = characters.length >= length
-  const result = canConvert
-    ? characters.slice(0, length).map((char) => String(char.codePointAt(0)! % 10)).join('')
-    : ''
+  const characterDetails = characters.slice(0, length).map((char) => ({
+    character: char,
+    codePoint: char.codePointAt(0)!,
+    digit: String(char.codePointAt(0)! % 10),
+  }))
+  const result = canConvert ? characterDetails.map(({ digit }) => digit).join('') : ''
 
   async function copy() {
     if (!result) return
@@ -72,6 +75,19 @@ function App() {
             </div>
           </div>
           <p className="field-hint" style={{ margin: '12px 0 0', lineHeight: 1.6 }}>ระบบใช้ {length} อักขระแรก (ไม่นับช่องว่าง) แปลงรหัสอักขระแต่ละตัวเป็นเลขหลักหน่วย 0–9</p>
+
+          {canConvert && <div className="breakdown" aria-label="แจกแจงการแปลงอักขระเป็นตัวเลข">
+            <div className="breakdown-title">ที่มาของตัวเลขแต่ละหลัก</div>
+            <p className="field-hint" style={{ margin: '0 0 10px', lineHeight: 1.6 }}>ตัวเลข = รหัสอักขระ ÷ 10 แล้วใช้เศษที่เหลือ</p>
+            <div className="word-list">
+              {characterDetails.map(({ character, codePoint, digit }, index) => <div className="word-row" key={`${index}-${codePoint}`}>
+                <span className="word-index">หลัก {index + 1}</span>
+                <span className="word-text" style={{ maxWidth: '20%' }}>{character}</span>
+                <span className="word-line" />
+                <span className="word-count" style={{ minWidth: 'auto' }}>รหัส {codePoint} → {digit}</span>
+              </div>)}
+            </div>
+          </div>}
         </section>
 
         <footer><span>ไม่ควรใช้ผลลัพธ์นี้เป็นรหัสผ่านหรือ PIN จริง</span><span className="footer-mark">P2N · ใช้งานออฟไลน์ได้</span></footer>
