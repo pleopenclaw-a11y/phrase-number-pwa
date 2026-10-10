@@ -1,107 +1,148 @@
 import { useEffect, useState } from 'react'
-import { ArrowDownUp, Copy, RotateCcw, ShieldCheck, Sparkles } from 'lucide-react'
+import { ArrowUpRight, Check, Clipboard, Info, RotateCcw, ShieldCheck, X } from 'lucide-react'
 import { encodePhrase } from './encode.js'
 import './style.css'
+
+type Encoded = {
+  code: string
+  digest: string
+  details: { byte: number; digit: string }[]
+}
 
 function App() {
   const [phrase, setPhrase] = useState('')
   const [length, setLength] = useState<4 | 6>(4)
+  const [encoded, setEncoded] = useState<Encoded | null>(null)
   const [copied, setCopied] = useState(false)
-  const [encoded, setEncoded] = useState<{ code: string; digest: string; details: { byte: number; digit: string }[] } | null>(null)
+  const [copyError, setCopyError] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
 
   useEffect(() => {
     let active = true
-    if (!phrase.trim()) {
-      setEncoded(null)
-      return () => { active = false }
+    setEncoded(null)
+    if (phrase.trim()) {
+      encodePhrase(phrase, length)
+        .then(value => { if (active) setEncoded(value) })
+        .catch(() => { if (active) setEncoded(null) })
     }
-    encodePhrase(phrase, length).then((value) => {
-      if (active) setEncoded(value)
-    }).catch(() => {
-      if (active) setEncoded(null)
-    })
     return () => { active = false }
   }, [phrase, length])
 
+  useEffect(() => {
+    if (!showDetails) return
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowDetails(false)
+    }
+    window.addEventListener('keydown', onEscape)
+    return () => window.removeEventListener('keydown', onEscape)
+  }, [showDetails])
+
   const result = encoded?.code ?? ''
+  const hasPhrase = phrase.trim().length > 0
 
-  async function copy() {
-    if (!result) return
-    await navigator.clipboard.writeText(result)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1600)
-  }
-
-  function clear() {
-    setPhrase('')
+  function changePhrase(value: string) {
+    setPhrase(value)
     setEncoded(null)
     setCopied(false)
+    setCopyError(false)
+  }
+
+  function changeLength(value: 4 | 6) {
+    setLength(value)
+    setEncoded(null)
+    setCopied(false)
+    setCopyError(false)
+  }
+
+  async function copyCode() {
+    if (!result) return
+    try {
+      await navigator.clipboard.writeText(result)
+      setCopied(true)
+      setCopyError(false)
+    } catch {
+      setCopied(false)
+      setCopyError(true)
+    }
   }
 
   return (
-    <main className="page">
-      <div className="glow glow-one" /><div className="glow glow-two" />
-      <div className="shell">
-        <header className="topbar">
-          <a className="brand" href="#top" aria-label="หน้าหลัก แปลงข้อความเป็นตัวเลข">
-            <span className="brand-icon"><ArrowDownUp size={20} /></span>
-            <span>ข้อความ<span className="brand-accent">→</span>ตัวเลข</span>
-          </a>
-          <span className="local-pill"><span className="green-dot" /> ประมวลผลในเครื่อง</span>
+    <main className="viewport">
+      <div className="app-frame">
+        <header className="header">
+          <div className="identity" aria-label="Phrase to Number">
+            <span className="logo">P<span>/</span>N</span>
+            <div className="identity-wordmark"><strong>PHRASE / NUMBER</strong><small>TEXT UTILITY — 001</small></div>
+          </div>
+          <span className="status"><span className="status-dot" /> LOCAL</span>
         </header>
 
-        <section className="hero" id="top">
-          <div className="eyebrow"><Sparkles size={14} /> เปลี่ยนข้อความให้เป็นชุดตัวเลข</div>
-          <h1>ข้อความเป็น<br /><span>ตัวเลข</span></h1>
-          <p className="subtitle">พิมพ์ข้อความ แล้วรับชุดตัวเลขตามความยาวที่เลือก<br className="desktop-break" /> ใช้ตัวอักษรตามลำดับจากข้อความของคุณ</p>
-        </section>
+        <div className="intro">
+          <div className="intro-label"><span className="rule" /> เครื่องมือแปลงข้อความ</div>
+          <h1>ข้อความ <span>→</span> ตัวเลข</h1>
+          <p>ใส่ข้อความ เลือกจำนวนหลัก แล้วคัดลอกได้ทันที</p>
+        </div>
 
-        <section className="workspace" aria-label="เครื่องมือแปลงข้อความเป็นตัวเลข">
-          <label className="field-label" htmlFor="phrase">ข้อความที่ต้องการแปลง</label>
-          <div className="input-wrap">
-            <textarea id="phrase" value={phrase} onChange={(e) => { setPhrase(e.target.value); setEncoded(null); setCopied(false) }} placeholder="พิมพ์ข้อความหรือประโยคที่นี่..." rows={3} maxLength={240} autoComplete="off" spellCheck={false} />
-            {phrase && <button className="clear-btn" onClick={clear} aria-label="ล้างข้อความ"><RotateCcw size={16} /></button>}
+        <div className="work-area">
+          <div className="controls">
+            <section className="input-section" aria-labelledby="input-heading">
+              <div className="section-head"><label id="input-heading" htmlFor="phrase">01 <span>/</span> ข้อความต้นทาง</label><span className="small-meta">{phrase.length} / 240</span></div>
+              <div className="input-box">
+                <textarea
+                  id="phrase"
+                  className="phrase-input"
+                  value={phrase}
+                  maxLength={240}
+                  onChange={event => changePhrase(event.target.value)}
+                  placeholder="พิมพ์คำหรือประโยคที่นี่…"
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  aria-label="ข้อความที่ต้องการแปลงเป็นตัวเลข"
+                  rows={2}
+                />
+                {phrase.length > 0 && <button className="reset-button" type="button" onClick={() => changePhrase('')} aria-label="ล้างข้อความทั้งหมด"><X size={18} strokeWidth={2} /></button>}
+              </div>
+              <div className="input-subline"><span className="input-dot" /> ไม่จัดเก็บข้อความที่พิมพ์</div>
+            </section>
+
+            <section className="mode-section" aria-label="เลือกความยาวตัวเลข">
+              <div className="section-head"><span>02 <span>/</span> จำนวนหลัก</span><span className="small-meta">เลือกความยาว</span></div>
+              <div className="segmented" role="group" aria-label="เลือกความยาวชุดตัวเลข">
+                <button type="button" className={length === 4 ? 'segment active' : 'segment'} aria-pressed={length === 4} onClick={() => changeLength(4)}><b>04</b><span>4 หลัก</span></button>
+                <button type="button" className={length === 6 ? 'segment active' : 'segment'} aria-pressed={length === 6} onClick={() => changeLength(6)}><b>06</b><span>6 หลัก</span></button>
+              </div>
+            </section>
           </div>
-          <div className="privacy-note"><ShieldCheck size={14} /> ข้อความประมวลผลบนอุปกรณ์นี้ ไม่ส่งออกและไม่บันทึก</div>
 
-          <div className="settings-head"><span className="field-label">ความยาวชุดตัวเลข</span><span className="field-hint">เลือก 4 หรือ 6 หลัก</span></div>
-          <div className="mode-grid" role="group" aria-label="เลือกความยาวชุดตัวเลข">
-            <button className={`mode-card ${length === 4 ? 'selected' : ''}`} onClick={() => { setLength(4); setEncoded(null); setCopied(false) }} aria-pressed={length === 4}>
-              <span className="mode-icon">4</span><span className="mode-copy"><b>4 หลัก</b><small>แปลงข้อความทั้งก้อนเป็นเลข 4 หลัก</small></span><span className="radio" />
+          <section className="result-section" aria-labelledby="result-heading">
+            <div className="result-head"><span id="result-heading">03 <span>/</span> RESULT</span><span className="hash-mark">SHA—256</span></div>
+            <div className="result-center" aria-live="polite" aria-atomic="true">
+              <span className={result ? 'result-code ready' : 'result-code empty'}>{result || '—'.repeat(length)}</span>
+              <span className="result-caption">{result ? `${length} DIGITS · พร้อมใช้งาน` : hasPhrase ? 'กำลังประมวลผล…' : 'รอข้อความต้นทาง'}</span>
+            </div>
+            <button type="button" className="copy-button" disabled={!result} onClick={copyCode}>
+              {copied ? <Check size={19} strokeWidth={2.3} /> : <Clipboard size={19} strokeWidth={1.9} />}
+              <span>{copyError ? 'คัดลอกไม่ได้ กรุณาลองอีกครั้ง' : copied ? 'คัดลอกแล้ว' : 'คัดลอกตัวเลข'}</span>
+              <ArrowUpRight size={18} strokeWidth={1.9} className="copy-arrow" />
             </button>
-            <button className={`mode-card ${length === 6 ? 'selected' : ''}`} onClick={() => { setLength(6); setEncoded(null); setCopied(false) }} aria-pressed={length === 6}>
-              <span className="mode-icon">6</span><span className="mode-copy"><b>6 หลัก</b><small>แปลงข้อความทั้งก้อนเป็นเลข 6 หลัก</small></span><span className="radio" />
-            </button>
-          </div>
+          </section>
+        </div>
 
-          <div className="result-card" aria-live="polite">
-            <div className="result-top"><span className="field-label">ชุดตัวเลขที่ได้</span><span className="digits-count">SHA-256 · {length} หลัก</span></div>
-            <div className={`result-value ${result ? 'visible' : ''}`}>
-              {result || <span className="placeholder-result">{phrase.trim() ? 'กำลังคำนวณ...' : 'พิมพ์ข้อความเพื่อเริ่มแปลง'}</span>}
-            </div>
-            <div className="result-actions">
-              <button className="copy-btn" disabled={!result} onClick={copy}><Copy size={16} />{copied ? 'คัดลอกแล้ว!' : 'คัดลอกตัวเลข'}</button>
-            </div>
-          </div>
-          <p className="field-hint" style={{ margin: '12px 0 0', lineHeight: 1.6 }}>นำข้อความทั้งหมดไปคำนวณด้วย SHA-256 จากนั้นแปลงไบต์แรก ๆ เป็นเลขหลักหน่วยจนได้ {length} หลัก</p>
-
-          {encoded && <div className="breakdown" aria-label="รายละเอียดการแปลงข้อความด้วย SHA-256">
-            <div className="breakdown-title">รายละเอียดการแปลง</div>
-            <p className="field-hint" style={{ margin: '0 0 8px', lineHeight: 1.6 }}>ข้อความทั้งก้อน → SHA-256 → ไบต์ → เศษจากการหาร 10</p>
-            <div className="word-list">
-              {encoded.details.map(({ byte, digit }, index) => <div className="word-row" key={index}>
-                <span className="word-index">ไบต์ {index + 1}</span>
-                <span className="word-text" style={{ maxWidth: 'none' }}>{byte} ÷ 10</span>
-                <span className="word-line" />
-                <span className="word-count" style={{ minWidth: 'auto' }}>เศษ {digit}</span>
-              </div>)}
-            </div>
-            <p className="field-hint" style={{ margin: '10px 0 0', lineHeight: 1.6, overflowWrap: 'anywhere' }}>ค่า SHA-256: {encoded.digest}</p>
-          </div>}
-        </section>
-
-        <footer><span>ไม่ควรใช้ผลลัพธ์นี้เป็นรหัสผ่านหรือ PIN จริง</span><span className="footer-mark">P2N · ใช้งานออฟไลน์ได้</span></footer>
+        <footer className="foot">
+          <div className="trust-row"><span><ShieldCheck size={15} /> คำนวณในเครื่องเท่านั้น</span><button type="button" onClick={() => setShowDetails(true)}>วิธีคำนวณ <Info size={14} /></button></div>
+          <p>เพื่อช่วยจำเท่านั้น ไม่แนะนำให้ใช้เป็น PIN หรือรหัสผ่านจริง</p>
+        </footer>
       </div>
+
+      {showDetails && <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (event.currentTarget === event.target) setShowDetails(false) }}>
+        <section className="details-sheet" role="dialog" aria-modal="true" aria-labelledby="details-heading">
+          <div className="details-header"><div><span className="details-overline">METHODOLOGY / 001</span><h2 id="details-heading">วิธีคำนวณตัวเลข</h2></div><button type="button" onClick={() => setShowDetails(false)} aria-label="ปิดรายละเอียด"><X size={20} /></button></div>
+          <p className="details-description">นำข้อความทั้งหมดไปทำ SHA-256 แล้วนำไบต์แรกตามจำนวนหลักที่เลือก หารด้วย 10 และใช้เศษเป็นตัวเลขแต่ละหลัก ข้อความเดิมจึงให้ผลลัพธ์เดิมเสมอ</p>
+          {encoded ? <><div className="details-table" aria-label="รายละเอียดแต่ละหลัก">{encoded.details.map(({byte, digit}, index) => <div className="details-row" key={index}><span>{String(index + 1).padStart(2, '0')}</span><span>{byte} % 10</span><strong>{digit}</strong></div>)}</div><div className="digest-title">SHA-256 DIGEST</div><code className="digest">{encoded.digest}</code></> : <div className="details-empty">พิมพ์ข้อความในหน้าแรกเพื่อดูรายละเอียดของผลลัพธ์</div>}
+          <div className="details-warning"><RotateCcw size={16} /> ไม่ใช่ระบบสุ่ม PIN ที่ปลอดภัยสำหรับบัญชีจริง</div>
+        </section>
+      </div>}
     </main>
   )
 }
